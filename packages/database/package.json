@@ -1,0 +1,41 @@
+{
+  "name": "@noted/database",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./dist/schema/index.js"
+    },
+    "./schema/*": {
+      "types": "./dist/schema/*.d.ts",
+      "default": "./dist/schema/*.js"
+    },
+    "./queries/*": {
+      "types": "./dist/queries/*.d.ts",
+      "default": "./dist/queries/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.2",
+    "nanoid": "^5.1.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250604.0",
+    "drizzle-kit": "^0.31.4",
+    "typescript": "^5.7.2"
+  }
+}

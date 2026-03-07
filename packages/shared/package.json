@@ -1,0 +1,30 @@
+{
+  "name": "@noted/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
+    },
+    "./validators": {
+      "types": "./dist/validators/index.d.ts",
+      "default": "./dist/validators/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.51"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
