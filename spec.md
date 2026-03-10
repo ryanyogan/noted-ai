@@ -99,54 +99,27 @@ Using Notion-style design:
 - [x] PublicHeader updated (gradients removed)
 - [x] Dashboard colors fixed (slate -> CSS variables)
 - [x] Root layout using CSS variables (bg-background, text-foreground)
-- [x] Tiptap packages installed (react, starter-kit, placeholder, task-list, suggestion)
-- [x] Tiptap v3 extensions (image, youtube, highlight, link, bubble-menu, floating-menu)
+- [x] BlockNote editor (`@blocknote/shadcn`) - Notion-style block editor
 - [x] Notes CRUD server functions (`src/lib/notes.ts`)
-- [x] NoteEditor component with auto-save
-- [x] SlashCommandMenu with full commands (headings, lists, task list, quote, code, divider, image, youtube)
-- [x] EditorBubbleMenu (bold, italic, strike, code, highlight, link)
-- [x] Note route (`/app/note/$noteId`)
+- [x] NoteEditor component with auto-save (BlockNote)
+- [x] Note route (`/app/note/$noteId`) with SSR disabled
 - [x] Dashboard with notes list and create note functionality
-- [x] Editor CSS styles (placeholder, typography, slash menu, bubble menu)
+- [x] Dashboard route loader - prefetch notes using `ensureQueryData` with TanStack Query
 
 ## In Progress
 
-- [ ] Fix note creation/loading bug (Tiptap SSR hydration issue)
+- [ ] Folders and Tags - CRUD for organization
 
-## Known Issues
+## Completed Recently
 
-### Note Creation Bug (Unresolved)
-
-**Symptom**: Clicking "New Note" creates the note but the `/app/note/$noteId` page shows a spinner/loading state instead of the editor.
-
-**Root Causes Identified**:
-
-1. **Tiptap SSR Hydration** - Tiptap editor renders on server but can't hydrate properly on client. Need to add `immediatelyRender: false` to useEditor config in `NoteEditor.tsx`.
-
-2. **D1 Migration Missing** - The notes table schema may not be applied to D1. Need to run:
-   ```bash
-   cd packages/database && pnpm db:generate
-   curl -X POST http://localhost:3000/api/migrate
-   ```
-
-3. **No Error Handling** - The note route loader doesn't handle errors gracefully. Need to add `pendingComponent` and `errorComponent`.
-
-**Fix Required in `NoteEditor.tsx`**:
-```typescript
-const editor = useEditor({
-  // ... extensions
-  immediatelyRender: false,  // <-- Add this for SSR compatibility
-  // ... rest of config
-})
-```
+- [x] Replaced Tiptap with BlockNote for better Notion-style block editing
+- [x] Dashboard route loader - prefetch notes using `ensureQueryData` with TanStack Query
+- [x] D1 migrations applied locally
 
 ## Next Steps (in order)
 
-1. **Fix Tiptap SSR issue** - Add `immediatelyRender: false` to useEditor config
-2. **Run D1 migrations** - Apply notes table schema to D1 database
-3. **Add error handling** - pendingComponent and error boundary for note route
-4. **Test full editor flow** - Create notes, slash commands, bubble menu, auto-save
-5. **Folders and Tags** - CRUD for organization
+1. **Add error handling** - pendingComponent and error boundary for note route
+2. **Folders and Tags** - CRUD for organization
 
 ## Future Phases
 
@@ -157,213 +130,79 @@ const editor = useEditor({
 
 ---
 
-## Tiptap Editor Implementation Plan
+## BlockNote Editor
 
-### Already Installed Packages
+### Installed Packages
 
 ```
-@tiptap/react
-@tiptap/starter-kit
-@tiptap/pm
-@tiptap/extension-placeholder
-@tiptap/extension-task-item
-@tiptap/extension-task-list
-@tiptap/suggestion
+@blocknote/core
+@blocknote/react
+@blocknote/shadcn
 ```
 
-### Additional Packages to Install
+### Editor Features (Built-in)
 
-```bash
-pnpm add @tiptap/extension-image @tiptap/extension-youtube @tiptap/extension-highlight @tiptap/extension-link tippy.js --filter @noted/web
-```
+BlockNote provides these features out of the box:
+- **Block-based editing** - Notion-style blocks with drag handles
+- **Slash commands** - Type `/` to access all block types
+- **Formatting toolbar** - Appears on text selection
+- **Block types**: Headings (H1-H3), paragraphs, bullet/numbered lists, checkboxes, code blocks, images, etc.
+- **Keyboard shortcuts** - Standard formatting shortcuts
+- **Dark mode support** - Automatic theme detection
 
-### Editor Features
+### Component: `src/components/editor/NoteEditor.tsx`
 
-#### Core Extensions (via StarterKit)
-- Headings (H1, H2, H3)
-- Bullet lists, Numbered lists
-- Blockquote, Code block, Horizontal rule
-- Bold, Italic, Strike, Code (inline)
-- Undo/Redo, Dropcursor, Gapcursor
+```tsx
+import { useCreateBlockNote, useEditorChange } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/shadcn";
+import "@blocknote/shadcn/style.css";
 
-#### Additional Extensions
-- **TaskList + TaskItem** - Checkbox/todo lists (already installed)
-- **Placeholder** - "Type '/' for commands..." (already installed)
-- **Image** - Image blocks with resize
-- **YouTube** - Video embeds
-- **Highlight** - Text highlighting
-- **Link** - Hyperlinks
-
-### Components to Build
-
-#### 1. `src/components/editor/NoteEditor.tsx`
-Main editor wrapper with:
-- Tiptap `useEditor` hook
-- StarterKit + extensions configured
-- Debounced auto-save (1000ms)
-- Save on blur and before unload
-- Notion-style typography (use `.prose-noted` from styles.css)
-
-#### 2. `src/components/editor/SlashCommandMenu.tsx`
-Slash command popup using `@tiptap/suggestion`:
-
-| Command | Icon | Description |
-|---------|------|-------------|
-| Heading 1 | H1 | Large section heading |
-| Heading 2 | H2 | Medium section heading |
-| Heading 3 | H3 | Small section heading |
-| Bullet List | • | Create a bullet list |
-| Numbered List | 1. | Create a numbered list |
-| Task List | ☐ | Track tasks with checkboxes |
-| Quote | " | Capture a quote |
-| Code Block | </> | Add a code snippet |
-| Divider | — | Visual divider |
-| Image | 🖼 | Upload or embed image |
-| YouTube | ▶ | Embed YouTube video |
-
-Use `tippy.js` for positioning. Filter commands by typed query.
-
-#### 3. `src/components/editor/EditorBubbleMenu.tsx`
-Floating toolbar on text selection:
-- Bold, Italic, Strikethrough
-- Code (inline)
-- Highlight
-- Link (prompt for URL)
-
-### Auto-Save Implementation
-
-```typescript
-// Pattern: Debounced save with flush on blur/unload
-const debouncedSave = useMemo(
-  () => debounce(async (content, noteId) => {
-    await updateNote({ id: noteId, content })
-  }, 1000),
-  []
-)
-
-// In useEditor config:
-onUpdate: ({ editor }) => {
-  debouncedSave(editor.getJSON(), noteId)
+export function NoteEditor({ initialContent, onSave }) {
+  const editor = useCreateBlockNote({ initialContent });
+  
+  useEditorChange(() => {
+    debouncedSave(editor.document);
+  }, editor);
+  
+  return <BlockNoteView editor={editor} theme={isDark ? "dark" : "light"} />;
 }
-
-// Flush on blur
-editor.on('blur', () => debouncedSave.flush())
-
-// Flush before unload
-window.addEventListener('beforeunload', () => debouncedSave.flush())
 ```
 
-### Notes CRUD Server Functions
+### Content Format (BlockNote JSON)
 
-Location: `apps/web/src/lib/notes.ts`
-
-```typescript
-// getNotes() - List user's notes (with filters)
-// getNote(id) - Single note by ID
-// createNote() - Create new note, return ID
-// updateNote({ id, title?, content? }) - Update note
-// deleteNote(id) - Soft delete (move to trash)
-// permanentlyDeleteNote(id) - Hard delete
-```
-
-### Note Route Structure
-
-```
-/app/note/$noteId.tsx
-```
-
-- Fetch note in `loader` (server function)
-- Wrap editor in `<ClientOnly>` component
-- Inline title editing (contentEditable or separate input)
-- Auto-save status indicator ("Saving...", "Saved")
-
-### Database Schema (Already Exists)
-
-`packages/database/src/schema/notes.ts`:
-- `content: text` - JSON string of Tiptap document
-- `contentText: text` - Plain text for search
-- Ready for future Yjs state storage
-
-### Content Format (Tiptap JSON)
+BlockNote uses an array of blocks (different from Tiptap's doc structure):
 
 ```json
-{
-  "type": "doc",
-  "content": [
-    {
-      "type": "heading",
-      "attrs": { "level": 1 },
-      "content": [{ "type": "text", "text": "Note Title" }]
-    },
-    {
-      "type": "paragraph",
-      "content": [{ "type": "text", "text": "Content here..." }]
-    },
-    {
-      "type": "taskList",
-      "content": [
-        {
-          "type": "taskItem",
-          "attrs": { "checked": false },
-          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Todo" }] }]
-        }
-      ]
-    }
-  ]
-}
+[
+  {
+    "id": "abc123",
+    "type": "heading",
+    "props": { "level": 1 },
+    "content": [{ "type": "text", "text": "Note Title" }],
+    "children": []
+  },
+  {
+    "id": "def456",
+    "type": "paragraph",
+    "props": {},
+    "content": [{ "type": "text", "text": "Content here..." }],
+    "children": []
+  }
+]
 ```
 
-### Future: Yjs Collaboration
+### Database Schema
 
-When ready to add real-time collaboration:
+`packages/database/src/schema/notes.ts`:
+- `content: text` - JSON string of BlockNote blocks array
+- `contentText: text` - Plain text extraction for search
 
-1. Install: `@tiptap/extension-collaboration yjs y-websocket`
-2. Store Yjs state: Add `yjsState: blob` column to notes table
-3. Disable StarterKit history: `history: false`
-4. Add Collaboration extension with Y.Doc
-5. Set up WebSocket provider (Cloudflare Durable Objects or external)
+### Future: Real-time Collaboration
 
-### CSS for Editor
-
-Add to `styles.css`:
-
-```css
-/* Tiptap placeholder */
-.tiptap p.is-editor-empty:first-child::before {
-  color: var(--muted-foreground);
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
-/* Slash command menu */
-.slash-menu {
-  @apply bg-popover border border-border rounded-lg shadow-lg p-2 min-w-[280px] max-h-[300px] overflow-y-auto;
-}
-
-.slash-menu-item {
-  @apply flex items-center gap-3 w-full px-3 py-2 rounded-[3px] text-left transition-colors duration-75;
-}
-
-.slash-menu-item:hover,
-.slash-menu-item.is-selected {
-  @apply bg-accent;
-}
-
-/* Bubble menu */
-.bubble-menu {
-  @apply flex items-center gap-1 bg-popover border border-border rounded-lg shadow-lg p-1;
-}
-
-.bubble-menu button {
-  @apply p-1.5 rounded-[3px] hover:bg-accent transition-colors duration-75;
-}
-
-.bubble-menu button.is-active {
-  @apply bg-accent text-[#2383e2];
-}
-```
+BlockNote supports Yjs for real-time collaboration:
+1. Install: `@blocknote/yjs yjs y-websocket`
+2. Use `YjsProvider` with BlockNote editor
+3. Set up WebSocket provider (Cloudflare Durable Objects or external)
 
 ## Commands
 
@@ -384,43 +223,6 @@ pnpm build                  # Build all
 - **Path alias**: Use `~/` not `@/` for imports
 - **No APIs**: Use `createServerFn` for server functions (except auth routes)
 - **Session**: Fetch in layout `beforeLoad`, access via `Route.useRouteContext()`
-- **Editor**: Use `immediatelyRender: false` in useEditor config for SSR compatibility
+- **Editor**: BlockNote with `ssr: false` on the note route
 - **Turbo**: Only apps run `dev`, packages just build
-
----
-
-## Session Notes (March 7, 2026)
-
-### Files Created
-- `apps/web/src/lib/notes.ts` - Notes CRUD server functions (getNotes, getNote, createNote, updateNote, trashNote, restoreNote, deleteNote)
-- `apps/web/src/components/editor/NoteEditor.tsx` - Main Tiptap editor with auto-save
-- `apps/web/src/components/editor/EditorBubbleMenu.tsx` - Selection toolbar (bold, italic, strike, code, highlight, link)
-- `apps/web/src/components/editor/SlashCommandMenu.tsx` - Slash commands extension with tippy.js
-- `apps/web/src/routes/app/note/$noteId.tsx` - Note page with title editing and editor
-
-### Files Modified
-- `apps/web/src/routes/app/index.tsx` - Dashboard with notes list and "New Note" button
-- `apps/web/src/styles.css` - Added comprehensive editor CSS (placeholder, typography, menus)
-- `apps/web/package.json` - Upgraded to Tiptap v3.20.1, added all extensions
-- `apps/web/src/components/layout/AppSidebar.tsx` - Removed gradients, Notion blue
-- `apps/web/src/components/layout/PublicHeader.tsx` - Removed gradients
-- `apps/web/src/routes/__root.tsx` - Fixed body classes to use CSS variables
-
-### Tiptap v3.20.1 Packages Installed
-```
-@tiptap/core
-@tiptap/react  
-@tiptap/pm
-@tiptap/starter-kit
-@tiptap/extension-placeholder
-@tiptap/extension-task-item
-@tiptap/extension-task-list
-@tiptap/suggestion
-@tiptap/extension-image
-@tiptap/extension-youtube
-@tiptap/extension-highlight
-@tiptap/extension-link
-@tiptap/extension-bubble-menu
-@tiptap/extension-floating-menu
-tippy.js (v6.3.7)
-```
+- **D1 Migrations**: Use `pnpm wrangler d1 migrations apply noted-db --local` from apps/web

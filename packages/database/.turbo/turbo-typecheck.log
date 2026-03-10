@@ -1,0 +1,4 @@
+
+> @noted/database@0.0.1 typecheck /home/ryan/personal/noted/packages/database
+> tsc --noEmit
+
